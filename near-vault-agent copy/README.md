@@ -1,4 +1,4 @@
-issues with aurora faucet, having to deploy on eth sepolia for now until faucet back
+Originally had issues with aurora faucet, having to deploy on eth sepolia for now until faucet back
 
 🌍 Deploying contracts to Ethereum Sepolia: ethereumSepolia
 ➤ Deployer: 0x1fF116257e646b6C0220a049e893e81DE87fc475
@@ -38,6 +38,10 @@ issues with aurora faucet, having to deploy on eth sepolia for now until faucet 
    4. Use your agent to manage the protocol on Sepolia!
 
 
+
+
+NEAR FAUCET FIXED:
+ADAPTED AND ADJUSTED TO NEAR:
    Near fixed:
    Mock USDC Token:      0xC0933C5440c656464D1Eb1F886422bE3466B1459
    Lottery Vault:        0xf0f994B4A8dB86A46a1eD4F12263c795b26703Ca
