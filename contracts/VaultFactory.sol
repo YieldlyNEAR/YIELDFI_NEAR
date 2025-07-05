@@ -2,12 +2,12 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// Import IERC20Metadata to use the correct type
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./Vault.sol";
 
-/// @title VaultFactory Contract for Flow
-/// @notice Factory contract for creating and managing Vault instances on Flow.
-/// @dev Implements access control for vault creation and management.
+/// @title VaultFactory Contract
+/// @notice Factory contract for creating and managing Vault instances.
 contract VaultFactory is Ownable {
     uint256 public vaultCounter;
     mapping(uint256 => address) public vaults;
@@ -18,7 +18,8 @@ contract VaultFactory is Ownable {
     address public treasury;
 
     struct VaultParams {
-        IERC20 asset;
+        // Changed type to match the Vault constructor
+        IERC20Metadata asset;
         string name;
         string symbol;
         address manager;
@@ -40,7 +41,8 @@ contract VaultFactory is Ownable {
         address _defaultAgent,
         address _treasury,
         uint256 _creationFee
-    ) Ownable(msg.sender) {
+    ) {
+        _transferOwnership(msg.sender);
         defaultManager = _defaultManager;
         defaultAgent = _defaultAgent;
         treasury = _treasury;
@@ -59,7 +61,7 @@ contract VaultFactory is Ownable {
         vaultCounter++;
         vaultId = vaultCounter;
 
-        // Note: The deBridgeGate parameter has been removed for Flow-specific deployment.
+        // This call now passes the correct type to the Vault constructor
         Vault vault = new Vault(
             params.asset,
             params.name,
@@ -84,7 +86,6 @@ contract VaultFactory is Ownable {
         return vaultCounter;
     }
 
-    // --- Admin Functions ---
     function setTreasury(address _newTreasury) external onlyOwner {
         treasury = _newTreasury;
     }
