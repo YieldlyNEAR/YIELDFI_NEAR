@@ -93,6 +93,13 @@ AIRebalancer.sol - AI-controlled rebalancing logic
 
 
 
+# TO RUN:
+python near-vault-agent/aurora_multi_vault_agent.py
+
+python test_aurora_integration.py
+
+
+
 
 
 
@@ -113,11 +120,13 @@ FRONTEND: Use of onflow/FCL module if needed in app
 
 
 
+
 Make agent interact with uniswap contracts... etc
 
 
 AI-Powered Yield Optimization for Flow Blockchain
 
+# VRF Powered Yield Strategy:
 
 🌊 Deploying contracts to Flow Testnet: flow_testnet
 ➤ Deployer: 0xa341b0F69359482862Ed4422c6057cd59560D9E4
