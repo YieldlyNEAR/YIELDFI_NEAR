@@ -330,75 +330,37 @@ class TriSolarisProvider:
                 "status": "fallback"
             }
 
+            # RIP NO BASTION underserving of indents
 class BastionProvider:
-    """Real-time data from the Bastion Protocol with ML risk assessment."""
+    """
+    Provides fallback data for Bastion Protocol. Since the protocol's testnet
+    contracts are inactive, this provider returns stable, estimated values.
+    """
     
-    def __init__(self):
-        # Correct cUSDC address for Bastion's Aurora Realm
-        self.cusdc_address = "0x8E9FB3f2cc8b08184CB5FB7BcDC61188E80C3cB0"
-        
-        # Minimal ABI to get the supply rate
-        self.cusdc_abi = [{
-            "constant": True,
-            "inputs": [],
-            "name": "supplyRatePerBlock",
-            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-            "payable": False,
-            "stateMutability": "view",
-            "type": "function"
-        }]
-        
-        # Aurora block time is ~1 second, so this is a reasonable estimate
-        self.BLOCKS_PER_YEAR = 31536000 
-
     def get_lending_data(self) -> Dict[str, Any]:
-        """Get live lending rates from the Bastion cUSDC contract."""
-        try:
-            # Create a contract instance
-            bastion_contract = w3.eth.contract(address=self.cusdc_address, abi=self.cusdc_abi)
-            
-            # Call the contract to get the current supply rate per block
-            supply_rate = bastion_contract.functions.supplyRatePerBlock().call()
-            
-            # Calculate the APY
-            # The rate is a fixed-point number with 18 decimals
-            supply_apy = (supply_rate / 1e18) * self.BLOCKS_PER_YEAR * 100
-            
-            risk_score = get_ml_risk_score(
-                AURORA_STRATEGY_ADDRESSES["bastion"], 
-                "Bastion", 
-                0.25
-            )
-            
-            return {
-                "protocol": "bastion",
-                "supply_apy": supply_apy,
-                "utilization": 0.75, # This value is harder to get and can be estimated
-                "estimated_apy": supply_apy, # Use the live APY
-                "risk_score": risk_score,
-                "ml_enhanced": ML_RISK_AVAILABLE,
-                "status": "active"
-            }
-                
-        except Exception as e:
-            print(f"⚠️ Bastion contract unavailable, using fallback data: {e}")
-            
-            risk_score = get_ml_risk_score(
-                AURORA_STRATEGY_ADDRESSES["bastion"], 
-                "Bastion", 
-                0.25
-            )
-            
-            return {
-                "protocol": "bastion",
-                "supply_apy": 9.1,
-                "utilization": 0.70,
-                "estimated_apy": 9.1,
-                "risk_score": risk_score,
-                "ml_enhanced": ML_RISK_AVAILABLE,
-                "status": "fallback"
-            }
+        """Returns a hardcoded, estimated data set for Bastion."""
+        
+        # Since the protocol's testnet contracts are unresponsive, we
+        # return a stable, estimated value instead of attempting a live call.
+        print("ℹ️ Bastion Protocol is inactive on testnet; using estimated fallback data.")
 
+        risk_score = get_ml_risk_score(
+            AURORA_STRATEGY_ADDRESSES["bastion"], 
+            "Bastion", 
+            0.25 # Default risk score
+        )
+        
+        return {
+            "protocol": "bastion",
+            "supply_apy": 9.1,
+            "utilization": 0.70,
+            "estimated_apy": 9.1,
+            "risk_score": risk_score,
+            "ml_enhanced": ML_RISK_AVAILABLE,
+            "status": "fallback"
+        }
+
+        
 # Initialize providers
 ref_provider = RefFinanceProvider()
 tri_provider = TriSolarisProvider()
