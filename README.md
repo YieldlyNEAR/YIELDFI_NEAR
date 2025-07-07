@@ -1,3 +1,6 @@
+VAULT YIELD AGGREGATOR:
+
+
 Yield farming options:
 1. bridge to eth and use
 eth-contracts
@@ -99,10 +102,61 @@ AuroraVault.sol - Main ERC4626 vault
 RefFinanceStrategy.sol - Ref Finance DEX integration
 TriSolarisStrategy.sol - TriSolaris AMM integration
 BastionStrategy.sol - Bastion lending integration
-AuroraVRFStrategy.sol - Your existing lottery (as one strategy)
+AuroraVRFStrategy.sol - VRF random strategy
 AIRebalancer.sol - AI-controlled rebalancing logic
 
 
+# AI Vault Agent Endpoints:
+i.e. for:
+`python near-vault-agent/aurora_multi_vault_agent_with_ml.py`
+
+🏦 Vault & Asset Management
+Mint Test USDC
+curl -X POST "http://localhost:8000/mint-usdc?amount=1500"
+Mints test USDC tokens to your agent's wallet for testing.
+
+Deposit into Vault
+curl -X POST "http://localhost:8000/deposit-test?amount=500"
+Deposits a specific amount of USDC from your agent's wallet into the vault.
+
+⚙️ Core Agent Actions
+Force Rebalance
+curl -X POST http://localhost:8000/rebalance
+Triggers an immediate AI-optimized rebalance of assets across all strategies.
+
+Force Harvest
+curl -X POST http://localhost:8000/harvest
+Harvests and compounds the accumulated yield from all strategies back into the vault.
+
+Invoke AI Agent
+curl -X POST -H "Content-Type: application/json" -d '{"command": "what is the current vault status?"}' http://localhost:8000/invoke-agent
+Sends a natural language command to the full LangChain agent for complex queries.
+
+📊 Reporting & Monitoring
+Get Vault Status
+curl http://localhost:8000/status
+Retrieves a comprehensive status dashboard of the vault's assets, APY, and allocations.
+
+Analyze Yields
+curl http://localhost:8000/yields
+Gets a real-time analysis of yields, risks, and the AI's optimal allocation.
+
+Check Risk Report
+curl http://localhost:8000/risk
+Fetches the latest ML-enhanced risk report for the entire portfolio.
+
+Assess a Specific Strategy's Risk
+curl -X POST "http://localhost:8000/assess-risk?strategy_address=0xYourStrategyAddressHere"
+Gets a detailed ML-based risk score for a single strategy contract address.
+
+✅ System Health
+Health Check
+curl http://localhost:8000/health
+Checks the basic health and connectivity of the agent, RPC, and ML service.
+
+Root Endpoint
+curl http://localhost:8000/
+Shows the agent's welcome message and a summary of its features.
 
 
 
