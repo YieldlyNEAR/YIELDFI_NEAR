@@ -1,6 +1,6 @@
 # YieldFi: AI-Powered Multi-Strategy Vault on Aurora
 
-**Live Demo:** [https://lively-starburst-9bc69c.netlify.app](https://lively-starburst-9bc69c.netlify.app)
+**[Live Demo](https://lively-starburst-9bc69c.netlify.app)**
 
 YieldFi is an intelligent, multi-protocol yield aggregator built on the Aurora network. It leverages a sophisticated AI agent, enhanced with a machine learning risk model, to dynamically manage and optimize a portfolio of digital assets across the Aurora DeFi ecosystem. The system automatically allocates user deposits to various strategies, such as lending on Bastion or providing liquidity on Ref Finance and Trisolaris, to maximize returns while actively managing risk.
 
