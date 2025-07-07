@@ -4,3 +4,4 @@ node_modules
 /node_modules
 
 near-vault-agent/.env
+near-vault-agent/env
