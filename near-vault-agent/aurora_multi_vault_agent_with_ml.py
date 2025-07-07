@@ -202,19 +202,21 @@ def get_ml_risk_score(strategy_address: str, protocol_name: str, fallback_score:
         return fallback_score
 
 class RefFinanceProvider:
-    """Real-time data from Ref Finance DEX with ML risk assessment."""
-    
     def __init__(self):
-        self.api_url = "https://indexer.ref-finance.io"
+        self.api_url = "https://testnet-indexer.ref-finance.com"
     
     def get_pools_data(self) -> Dict[str, Any]:
         """Get current pool data from Ref Finance with ML risk assessment."""
         try:
-            response = requests.get(f"{self.api_url}/list-pools", timeout=5)
+            # Use the correct /list-top-pools endpoint. No parameters are needed.
+            response = requests.get(f"{self.api_url}/list-top-pools", timeout=10)
+            response.raise_for_status()  # This will raise an error for bad responses (4xx or 5xx)
             pools = response.json()
             
-            # Find USDC pools
-            usdc_pools = [p for p in pools if 'usdc' in str(p.get('token_account_ids', [])).lower()]
+            # Find USDC pools by checking the more reliable 'token_symbols' field
+            usdc_pools = [
+                p for p in pools if any('usdc' in symbol.lower() for symbol in p.get('token_symbols', []))
+            ]
             
             total_tvl = sum(float(p.get('tvl', 0)) for p in usdc_pools)
             avg_fee = sum(float(p.get('total_fee', 0)) for p in usdc_pools) / len(usdc_pools) if usdc_pools else 0
@@ -223,7 +225,7 @@ class RefFinanceProvider:
             risk_score = get_ml_risk_score(
                 AURORA_STRATEGY_ADDRESSES["ref_finance"], 
                 "Ref Finance", 
-                0.35
+                0.35  # Fallback risk score
             )
             
             return {
@@ -237,7 +239,7 @@ class RefFinanceProvider:
                 "status": "active"
             }
         except Exception as e:
-            print(f"⚠️ Ref Finance API unavailable, using fallback data")
+            print(f"⚠️ Ref Finance API unavailable, using fallback data: {e}")
             
             # Get ML risk even with fallback data
             risk_score = get_ml_risk_score(
@@ -248,47 +250,70 @@ class RefFinanceProvider:
             
             return {
                 "protocol": "ref_finance",
-                "tvl": 50000000,  # $50M fallback TVL
+                "tvl": 50000000,
                 "avg_fee_rate": 0.003,
                 "pool_count": 25,
-                "estimated_apy": 15.2,  # Conservative estimate
+                "estimated_apy": 15.2,
                 "risk_score": risk_score,
                 "ml_enhanced": ML_RISK_AVAILABLE,
-                "status": "active"
+                "status": "fallback"
             }
-
+            
 class TriSolarisProvider:
-    """Real-time data from TriSolaris AMM with ML risk assessment."""
-    
+    """Real-time data from the TriSolaris Subgraph on The Graph."""
+
+    def __init__(self):
+        # The official Trisolaris Subgraph API endpoint
+        self.api_url = "https://api.thegraph.com/subgraphs/name/trisolaris/exchange"
+        self.query = """
+            query GetUsdcFarms {
+              liquidityPools(
+                first: 100,
+                orderBy: totalValueLockedUSD,
+                orderDirection: desc,
+                where: {inputTokens_: {symbol_contains_nocase: "usdc"}}
+              ) {
+                id
+                name
+                totalValueLockedUSD
+              }
+            }
+        """
+
     def get_farms_data(self) -> Dict[str, Any]:
-        """Get farming data from TriSolaris with ML risk assessment."""
+        """Get farming data from Trisolaris using a GraphQL query."""
         try:
-            response = requests.get("https://api.trisolaris.io/farms", timeout=5)
-            farms = response.json()
+            response = requests.post(self.api_url, json={"query": self.query}, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            usdc_farms = data.get("data", {}).get("liquidityPools", [])
+
+            if not usdc_farms:
+                raise Exception("No USDC farms found in The Graph response")
+
+            # Calculate total TVL from the live data
+            total_tvl = sum(float(farm.get("totalValueLockedUSD", 0)) for farm in usdc_farms)
             
-            usdc_farms = [f for f in farms if 'USDC' in f.get('name', '')]
-            avg_apy = sum(float(f.get('apy', 0)) for f in usdc_farms) / len(usdc_farms) if usdc_farms else 0
-            
-            # Get ML risk score
             risk_score = get_ml_risk_score(
                 AURORA_STRATEGY_ADDRESSES["trisolaris"], 
                 "TriSolaris", 
                 0.40
             )
-            
+
             return {
-                "protocol": "trisolaris", 
-                "farms": len(usdc_farms),
-                "avg_apy": avg_apy,
-                "estimated_apy": 12.8,
+                "protocol": "trisolaris",
+                "tvl": total_tvl, # Live TVL
+                "farms": len(usdc_farms), # Live farm count
+                "estimated_apy": 12.8, # Using hardcoded APY as live rewards are null
                 "risk_score": risk_score,
                 "ml_enhanced": ML_RISK_AVAILABLE,
                 "status": "active"
             }
+
         except Exception as e:
-            print(f"⚠️ TriSolaris API unavailable, using fallback data")
-            
-            # Get ML risk even with fallback data
+            print(f"⚠️ TriSolaris API unavailable, using fallback data: {e}")
+
             risk_score = get_ml_risk_score(
                 AURORA_STRATEGY_ADDRESSES["trisolaris"], 
                 "TriSolaris", 
@@ -297,50 +322,67 @@ class TriSolarisProvider:
             
             return {
                 "protocol": "trisolaris",
+                "tvl": 25000000, # Fallback TVL
                 "farms": 15,
-                "avg_apy": 12.8,
                 "estimated_apy": 12.8,
                 "risk_score": risk_score,
                 "ml_enhanced": ML_RISK_AVAILABLE,
-                "status": "active"
+                "status": "fallback"
             }
 
 class BastionProvider:
-    """Real-time data from Bastion Protocol with ML risk assessment."""
+    """Real-time data from the Bastion Protocol with ML risk assessment."""
     
+    def __init__(self):
+        # Correct cUSDC address for Bastion's Aurora Realm
+        self.cusdc_address = "0x8E9FB3f2cc8b08184CB5FB7BcDC61188E80C3cB0"
+        
+        # Minimal ABI to get the supply rate
+        self.cusdc_abi = [{
+            "constant": True,
+            "inputs": [],
+            "name": "supplyRatePerBlock",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "payable": False,
+            "stateMutability": "view",
+            "type": "function"
+        }]
+        
+        # Aurora block time is ~1 second, so this is a reasonable estimate
+        self.BLOCKS_PER_YEAR = 31536000 
+
     def get_lending_data(self) -> Dict[str, Any]:
-        """Get lending rates from Bastion with ML risk assessment."""
+        """Get live lending rates from the Bastion cUSDC contract."""
         try:
-            # Try to get on-chain data
-            cusdc_address = "0xe5308dc623101508952948b141fD9eaBd3337D99"  # Bastion cUSDC
+            # Create a contract instance
+            bastion_contract = w3.eth.contract(address=self.cusdc_address, abi=self.cusdc_abi)
             
-            # Simple balance check to see if contract exists
-            code = w3.eth.get_code(cusdc_address)
+            # Call the contract to get the current supply rate per block
+            supply_rate = bastion_contract.functions.supplyRatePerBlock().call()
             
-            # Get ML risk score
+            # Calculate the APY
+            # The rate is a fixed-point number with 18 decimals
+            supply_apy = (supply_rate / 1e18) * self.BLOCKS_PER_YEAR * 100
+            
             risk_score = get_ml_risk_score(
                 AURORA_STRATEGY_ADDRESSES["bastion"], 
                 "Bastion", 
                 0.25
             )
             
-            if len(code) > 0:
-                return {
-                    "protocol": "bastion",
-                    "supply_apy": 9.1,
-                    "utilization": 0.75,
-                    "estimated_apy": 9.1,
-                    "risk_score": risk_score,
-                    "ml_enhanced": ML_RISK_AVAILABLE,
-                    "status": "active"
-                }
-            else:
-                raise Exception("Contract not found")
+            return {
+                "protocol": "bastion",
+                "supply_apy": supply_apy,
+                "utilization": 0.75, # This value is harder to get and can be estimated
+                "estimated_apy": supply_apy, # Use the live APY
+                "risk_score": risk_score,
+                "ml_enhanced": ML_RISK_AVAILABLE,
+                "status": "active"
+            }
                 
         except Exception as e:
-            print(f"⚠️ Bastion contract unavailable, using fallback data")
+            print(f"⚠️ Bastion contract unavailable, using fallback data: {e}")
             
-            # Get ML risk even with fallback data
             risk_score = get_ml_risk_score(
                 AURORA_STRATEGY_ADDRESSES["bastion"], 
                 "Bastion", 
@@ -354,7 +396,7 @@ class BastionProvider:
                 "estimated_apy": 9.1,
                 "risk_score": risk_score,
                 "ml_enhanced": ML_RISK_AVAILABLE,
-                "status": "active"
+                "status": "fallback"
             }
 
 # Initialize providers
