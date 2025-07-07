@@ -78,14 +78,14 @@ AGENT_PRIVATE_KEY = os.getenv("AGENT_PRIVATE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Contract Addresses (Your Deployed Contracts!)
-MULTI_VAULT_ADDRESS = "0x98D6d0b9027Db5f035ab9d608D24896C7812455b" # UPDATED!
+MULTI_VAULT_ADDRESS = "0x15a616EB9df9fa0B8520C66a234f9BBD172847F5" # UPDATED!
 USDC_TOKEN_ADDRESS = "0xC0933C5440c656464D1Eb1F886422bE3466B1459"
 
 # Aurora Strategy Addresses (Your Deployed Strategies!)
 AURORA_STRATEGY_ADDRESSES = {
-    "ref_finance": "0x26416A701AF226a9B65dD498edC99a1EE1671A1a",
-    "trisolaris": "0xeA77EfCF32778715237A9ABAB8A9dEd24e1A1793", 
-    "bastion": "0x592eC554ec3Af631d76981a680f699F9618B5687" # UPDATED
+    "ref_finance": "0x5D6ea21714Ce7E04a16A2776A7e7c6d8ec5a1bd0",
+    "trisolaris": "0x841eC1D601B1E9392ec9ba840eF1618beE8D9911", 
+    "bastion": "0x215E95Fc16c460b9558C9213234B90971306e543" # UPDATED
 }
 
 
@@ -161,22 +161,22 @@ vault_abi = [
       "type": "constructor"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "owner",
           "type": "address"
         },
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "spender",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "value",
           "type": "uint256"
@@ -186,16 +186,16 @@ vault_abi = [
       "type": "event"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "strategy",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
@@ -205,16 +205,16 @@ vault_abi = [
       "type": "event"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "previousOwner",
           "type": "address"
         },
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "newOwner",
           "type": "address"
@@ -224,22 +224,22 @@ vault_abi = [
       "type": "event"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "strategy",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "string",
           "name": "name",
           "type": "string"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "allocation",
           "type": "uint256"
@@ -249,22 +249,22 @@ vault_abi = [
       "type": "event"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "strategy",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "oldBalance",
           "type": "uint256"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "newBalance",
           "type": "uint256"
@@ -274,22 +274,22 @@ vault_abi = [
       "type": "event"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "from",
           "type": "address"
         },
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "to",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "value",
           "type": "uint256"
@@ -299,16 +299,16 @@ vault_abi = [
       "type": "event"
     },
     {
-      "anonymous": false,
+      "anonymous": False,
       "inputs": [
         {
-          "indexed": true,
+          "indexed": True,
           "internalType": "address",
           "name": "strategy",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": False,
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
@@ -978,7 +978,7 @@ vault_abi = [
       "stateMutability": "nonpayable",
       "type": "function"
     }
-  ]
+]
 
 strategy_abi = [
     {"name": "deposit", "type": "function", "inputs": [{"type": "uint256"}], "outputs": [], "stateMutability": "nonpayable"},
