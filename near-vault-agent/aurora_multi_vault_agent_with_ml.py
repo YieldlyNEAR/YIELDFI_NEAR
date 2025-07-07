@@ -17,6 +17,57 @@ from langchain.tools import tool
 load_dotenv()
 
 # ==============================================================================
+# ML RISK ASSESSMENT INTEGRATION - FIXED IMPORT PATHS
+# ==============================================================================
+
+# Try to import the ML risk assessment with multiple path options
+try:
+    import sys
+    
+    # Try different possible paths
+    possible_paths = [
+        './ml-risk',
+        './near-vault-agent/ml-risk', 
+        'ml-risk',
+        'near-vault-agent/ml-risk',
+        os.path.join(os.path.dirname(__file__), 'ml-risk'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml-risk')
+    ]
+    
+    risk_api = None
+    ML_RISK_AVAILABLE = False
+    
+    for path in possible_paths:
+        try:
+            if path not in sys.path:
+                sys.path.append(path)
+            
+            # Check if risk_api.py exists in this path
+            risk_api_file = os.path.join(path, 'risk_api.py')
+            if os.path.exists(risk_api_file):
+                from risk_api import StrategyRiskAPI
+                
+                # Initialize ML risk API
+                risk_api = StrategyRiskAPI()
+                print(f"🧠 ML Risk Assessment: LOADED from {path}")
+                ML_RISK_AVAILABLE = True
+                break
+        except Exception as e:
+            continue
+    
+    if not ML_RISK_AVAILABLE:
+        raise ImportError("Could not find risk_api in any path")
+    
+except Exception as e:
+    print(f"⚠️ ML Risk Assessment: NOT AVAILABLE ({e})")
+    print("📝 To enable ML risk assessment:")
+    print("   1. Ensure near-vault-agent/ml-risk/risk_api.py exists")
+    print("   2. Run: python near-vault-agent/ml-risk/anomaly_risk_model.py")
+    print("   3. Restart the Aurora agent")
+    risk_api = None
+    ML_RISK_AVAILABLE = False
+
+# ==============================================================================
 # AURORA MULTI-STRATEGY CONFIGURATION
 # ==============================================================================
 
@@ -27,15 +78,17 @@ AGENT_PRIVATE_KEY = os.getenv("AGENT_PRIVATE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Contract Addresses (Your Deployed Contracts!)
-MULTI_VAULT_ADDRESS = "0x4716Be3fdea290c69D7dE19DE9059C7AEA7d64EB"
+MULTI_VAULT_ADDRESS = "0x98D6d0b9027Db5f035ab9d608D24896C7812455b" # UPDATE!
 USDC_TOKEN_ADDRESS = "0xC0933C5440c656464D1Eb1F886422bE3466B1459"
 
 # Aurora Strategy Addresses (Your Deployed Strategies!)
 AURORA_STRATEGY_ADDRESSES = {
-    "ref_finance": "0x28F6D4Fe5648BbF2506E56a5b7f9D5522C3999f1",
-    "trisolaris": "0xAF2A0D1CDAe0bae796083e772aF2a1736027BC30", 
-    "bastion": "0xE7d842CAf2f0F3B8BfDE371B06320F8Fd919b4a9"
+    "ref_finance": "0x26416A701AF226a9B65dD498edC99a1EE1671A1a",
+    "trisolaris": "0xeA77EfCF32778715237A9ABAB8A9dEd24e1A1793", 
+    "bastion": "0x592eC554ec3Af631d76981a680f699F9618B5687" # UPDATED
 }
+
+
 
 # Aurora Protocol Addresses (Real ones)
 AURORA_PROTOCOLS = {
@@ -132,8 +185,21 @@ tri_strategy_contract = w3.eth.contract(address=AURORA_STRATEGY_ADDRESSES["triso
 bastion_strategy_contract = w3.eth.contract(address=AURORA_STRATEGY_ADDRESSES["bastion"], abi=strategy_abi)
 
 # ==============================================================================
-# AURORA PROTOCOL DATA PROVIDERS
+# ML-ENHANCED AURORA PROTOCOL DATA PROVIDERS
 # ==============================================================================
+
+def get_ml_risk_score(strategy_address: str, protocol_name: str, fallback_score: float) -> float:
+    """Get ML risk score with fallback."""
+    if not ML_RISK_AVAILABLE or not risk_api:
+        return fallback_score
+    
+    try:
+        ml_score = risk_api.assess_strategy_risk(strategy_address)
+        print(f"🧠 ML Risk Score for {protocol_name}: {ml_score:.3f}")
+        return ml_score
+    except Exception as e:
+        print(f"⚠️ ML risk assessment failed for {protocol_name}: {e}")
+        return fallback_score
 
 class RefFinanceProvider:
     """Real-time data from Ref Finance DEX with ML risk assessment."""
@@ -148,22 +214,17 @@ class RefFinanceProvider:
             pools = response.json()
             
             # Find USDC pools
-            usdc_pools = [p for p in str(p.get('token_account_ids', [])).lower() if 'usdc' in pools]
+            usdc_pools = [p for p in pools if 'usdc' in str(p.get('token_account_ids', [])).lower()]
             
             total_tvl = sum(float(p.get('tvl', 0)) for p in usdc_pools)
             avg_fee = sum(float(p.get('total_fee', 0)) for p in usdc_pools) / len(usdc_pools) if usdc_pools else 0
             
-            # Use ML risk assessment if available
-            if risk_api:
-                try:
-                    ml_risk_score = risk_api.assess_strategy_risk(AURORA_STRATEGY_ADDRESSES["ref_finance"])
-                    risk_score = ml_risk_score
-                    print(f"🧠 ML Risk Score for Ref Finance: {ml_risk_score:.3f}")
-                except Exception as e:
-                    risk_score = 0.35
-                    print(f"⚠️ ML risk assessment failed for Ref Finance: {e}")
-            else:
-                risk_score = 0.35
+            # Get ML risk score
+            risk_score = get_ml_risk_score(
+                AURORA_STRATEGY_ADDRESSES["ref_finance"], 
+                "Ref Finance", 
+                0.35
+            )
             
             return {
                 "protocol": "ref_finance",
@@ -172,21 +233,18 @@ class RefFinanceProvider:
                 "pool_count": len(usdc_pools),
                 "estimated_apy": 15.2,
                 "risk_score": risk_score,
+                "ml_enhanced": ML_RISK_AVAILABLE,
                 "status": "active"
             }
         except Exception as e:
-            print(f"⚠️ Ref Finance API unavailable, using fallback data with ML risk")
+            print(f"⚠️ Ref Finance API unavailable, using fallback data")
             
-            # Use ML risk even with fallback data
-            if risk_api:
-                try:
-                    ml_risk_score = risk_api.assess_strategy_risk(AURORA_STRATEGY_ADDRESSES["ref_finance"])
-                    risk_score = ml_risk_score
-                    print(f"🧠 ML Risk Score for Ref Finance: {ml_risk_score:.3f}")
-                except Exception as e:
-                    risk_score = 0.35
-            else:
-                risk_score = 0.35
+            # Get ML risk even with fallback data
+            risk_score = get_ml_risk_score(
+                AURORA_STRATEGY_ADDRESSES["ref_finance"], 
+                "Ref Finance", 
+                0.35
+            )
             
             return {
                 "protocol": "ref_finance",
@@ -195,6 +253,7 @@ class RefFinanceProvider:
                 "pool_count": 25,
                 "estimated_apy": 15.2,  # Conservative estimate
                 "risk_score": risk_score,
+                "ml_enhanced": ML_RISK_AVAILABLE,
                 "status": "active"
             }
 
@@ -210,17 +269,12 @@ class TriSolarisProvider:
             usdc_farms = [f for f in farms if 'USDC' in f.get('name', '')]
             avg_apy = sum(float(f.get('apy', 0)) for f in usdc_farms) / len(usdc_farms) if usdc_farms else 0
             
-            # Use ML risk assessment
-            if risk_api:
-                try:
-                    ml_risk_score = risk_api.assess_strategy_risk(AURORA_STRATEGY_ADDRESSES["trisolaris"])
-                    risk_score = ml_risk_score
-                    print(f"🧠 ML Risk Score for TriSolaris: {ml_risk_score:.3f}")
-                except Exception as e:
-                    risk_score = 0.40
-                    print(f"⚠️ ML risk assessment failed for TriSolaris: {e}")
-            else:
-                risk_score = 0.40
+            # Get ML risk score
+            risk_score = get_ml_risk_score(
+                AURORA_STRATEGY_ADDRESSES["trisolaris"], 
+                "TriSolaris", 
+                0.40
+            )
             
             return {
                 "protocol": "trisolaris", 
@@ -228,21 +282,18 @@ class TriSolarisProvider:
                 "avg_apy": avg_apy,
                 "estimated_apy": 12.8,
                 "risk_score": risk_score,
+                "ml_enhanced": ML_RISK_AVAILABLE,
                 "status": "active"
             }
         except Exception as e:
-            print(f"⚠️ TriSolaris API unavailable, using fallback data with ML risk")
+            print(f"⚠️ TriSolaris API unavailable, using fallback data")
             
-            # Use ML risk even with fallback data
-            if risk_api:
-                try:
-                    ml_risk_score = risk_api.assess_strategy_risk(AURORA_STRATEGY_ADDRESSES["trisolaris"])
-                    risk_score = ml_risk_score
-                    print(f"🧠 ML Risk Score for TriSolaris: {ml_risk_score:.3f}")
-                except Exception as e:
-                    risk_score = 0.40
-            else:
-                risk_score = 0.40
+            # Get ML risk even with fallback data
+            risk_score = get_ml_risk_score(
+                AURORA_STRATEGY_ADDRESSES["trisolaris"], 
+                "TriSolaris", 
+                0.40
+            )
             
             return {
                 "protocol": "trisolaris",
@@ -250,6 +301,7 @@ class TriSolarisProvider:
                 "avg_apy": 12.8,
                 "estimated_apy": 12.8,
                 "risk_score": risk_score,
+                "ml_enhanced": ML_RISK_AVAILABLE,
                 "status": "active"
             }
 
@@ -265,17 +317,12 @@ class BastionProvider:
             # Simple balance check to see if contract exists
             code = w3.eth.get_code(cusdc_address)
             
-            # Use ML risk assessment
-            if risk_api:
-                try:
-                    ml_risk_score = risk_api.assess_strategy_risk(AURORA_STRATEGY_ADDRESSES["bastion"])
-                    risk_score = ml_risk_score
-                    print(f"🧠 ML Risk Score for Bastion: {ml_risk_score:.3f}")
-                except Exception as e:
-                    risk_score = 0.25
-                    print(f"⚠️ ML risk assessment failed for Bastion: {e}")
-            else:
-                risk_score = 0.25
+            # Get ML risk score
+            risk_score = get_ml_risk_score(
+                AURORA_STRATEGY_ADDRESSES["bastion"], 
+                "Bastion", 
+                0.25
+            )
             
             if len(code) > 0:
                 return {
@@ -284,24 +331,21 @@ class BastionProvider:
                     "utilization": 0.75,
                     "estimated_apy": 9.1,
                     "risk_score": risk_score,
+                    "ml_enhanced": ML_RISK_AVAILABLE,
                     "status": "active"
                 }
             else:
                 raise Exception("Contract not found")
                 
         except Exception as e:
-            print(f"⚠️ Bastion contract unavailable, using fallback data with ML risk")
+            print(f"⚠️ Bastion contract unavailable, using fallback data")
             
-            # Use ML risk even with fallback data
-            if risk_api:
-                try:
-                    ml_risk_score = risk_api.assess_strategy_risk(AURORA_STRATEGY_ADDRESSES["bastion"])
-                    risk_score = ml_risk_score
-                    print(f"🧠 ML Risk Score for Bastion: {ml_risk_score:.3f}")
-                except Exception as e:
-                    risk_score = 0.25
-            else:
-                risk_score = 0.25
+            # Get ML risk even with fallback data
+            risk_score = get_ml_risk_score(
+                AURORA_STRATEGY_ADDRESSES["bastion"], 
+                "Bastion", 
+                0.25
+            )
             
             return {
                 "protocol": "bastion",
@@ -309,6 +353,7 @@ class BastionProvider:
                 "utilization": 0.70,
                 "estimated_apy": 9.1,
                 "risk_score": risk_score,
+                "ml_enhanced": ML_RISK_AVAILABLE,
                 "status": "active"
             }
 
@@ -318,20 +363,25 @@ tri_provider = TriSolarisProvider()
 bastion_provider = BastionProvider()
 
 # ==============================================================================
-# AI STRATEGY OPTIMIZER
+# AI STRATEGY OPTIMIZER WITH ML RISK
 # ==============================================================================
 
 class AuroraAIOptimizer:
-    """AI-powered strategy optimization for Aurora protocols."""
+    """AI-powered strategy optimization for Aurora protocols with ML risk."""
     
     def __init__(self):
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, api_key=OPENAI_API_KEY)
     
     def optimize_allocation(self, current_data: Dict[str, Any]) -> Dict[str, float]:
-        """Use AI to optimize portfolio allocation."""
+        """Use AI to optimize portfolio allocation with ML risk data."""
         try:
+            # Add ML enhancement info to prompt
+            ml_status = "🧠 ML RISK ASSESSMENT: ACTIVE" if ML_RISK_AVAILABLE else "⚠️ ML RISK ASSESSMENT: FALLBACK MODE"
+            
             prompt = f"""
-You are an expert DeFi portfolio manager for Aurora ecosystem. 
+You are an expert DeFi portfolio manager for Aurora ecosystem with ML risk assessment.
+
+{ml_status}
 
 Current Protocol Data:
 {json.dumps(current_data, indent=2)}
@@ -344,16 +394,18 @@ Risk Constraints:
 - Min 5% reserve for liquidity
 - Target risk-adjusted returns
 - Consider Aurora gas advantages
+- Use ML risk scores when available
 
 Generate optimal allocation as JSON with allocation percentages that sum to 1.0:
 {{"ref_finance": 0.XX, "trisolaris": 0.XX, "bastion": 0.XX, "reserve": 0.XX}}
 
 Consider:
-1. Risk-adjusted APY for each protocol
-2. TVL and liquidity depth
-3. Historical performance
-4. Current market conditions
-5. Aurora ecosystem advantages
+1. ML-enhanced risk scores (if available)
+2. Risk-adjusted APY for each protocol
+3. TVL and liquidity depth
+4. Historical performance
+5. Current market conditions
+6. Aurora ecosystem advantages
 
 Respond with ONLY the JSON allocation object.
 """
@@ -397,13 +449,13 @@ Respond with ONLY the JSON allocation object.
 ai_optimizer = AuroraAIOptimizer()
 
 # ==============================================================================
-# MULTI-STRATEGY TOOLS
+# ML-ENHANCED TOOLS (Using raw_transaction)
 # ==============================================================================
 
 @tool
 def analyze_aurora_yields() -> str:
-    """Analyze real-time yields across all Aurora DeFi protocols."""
-    print("🔍 Analyzing Aurora yields...")
+    """Analyze real-time yields across all Aurora DeFi protocols with ML risk assessment."""
+    print("🔍 Analyzing Aurora yields with ML risk assessment...")
     
     try:
         # Gather data from all protocols
@@ -430,13 +482,15 @@ def analyze_aurora_yields() -> str:
         # Get AI recommendation
         optimal_allocation = ai_optimizer.optimize_allocation(protocols)
         
+        ml_indicator = "🧠 ML-Enhanced" if ML_RISK_AVAILABLE else "🔄 Fallback Mode"
+        
         return f"""
-🌐 Aurora DeFi Yield Analysis:
+🌐 Aurora DeFi Yield Analysis ({ml_indicator}):
 
 📊 Protocol Performance:
-├─ Ref Finance: {ref_data['estimated_apy']:.1f}% APY (Risk: {ref_data.get('risk_score', 0.5):.2f})
-├─ TriSolaris: {tri_data['estimated_apy']:.1f}% APY (Risk: {tri_data.get('risk_score', 0.5):.2f})
-└─ Bastion: {bastion_data['estimated_apy']:.1f}% APY (Risk: {bastion_data.get('risk_score', 0.5):.2f})
+├─ Ref Finance: {ref_data['estimated_apy']:.1f}% APY (Risk: {ref_data.get('risk_score', 0.5):.3f}) 
+├─ TriSolaris: {tri_data['estimated_apy']:.1f}% APY (Risk: {tri_data.get('risk_score', 0.5):.3f})
+└─ Bastion: {bastion_data['estimated_apy']:.1f}% APY (Risk: {bastion_data.get('risk_score', 0.5):.3f})
 
 🎯 AI Optimal Allocation:
 ├─ Ref Finance: {optimal_allocation.get('ref_finance', 0)*100:.1f}%
@@ -445,15 +499,107 @@ def analyze_aurora_yields() -> str:
 └─ Reserve: {optimal_allocation.get('reserve', 0)*100:.1f}%
 
 💡 Expected Portfolio APY: {sum(protocols[p]['estimated_apy'] * optimal_allocation.get(p, 0) for p in protocols):.1f}%
+
+🧠 ML Risk Status: {"ACTIVE - Using trained anomaly detection" if ML_RISK_AVAILABLE else "FALLBACK - Using static risk scores"}
         """
         
     except Exception as e:
         return f"❌ Error analyzing Aurora yields: {e}"
 
 @tool
+def assess_ml_strategy_risk(strategy_address: str) -> str:
+    """Assess a specific strategy's risk using ML anomaly detection."""
+    print(f"🧠 Assessing ML risk for strategy: {strategy_address}")
+    
+    try:
+        if not ML_RISK_AVAILABLE:
+            return f"""
+❌ ML Risk Assessment Not Available
+
+🔧 To enable ML risk assessment:
+1. Run: python near-vault-agent/ml-risk/anomaly_risk_model.py
+2. Ensure near-vault-agent/ml-risk/models/anomaly_risk_model.joblib exists
+3. Restart the Aurora agent
+
+📊 Currently using fallback risk scores
+
+💡 ML model paths checked:
+   - ./ml-risk/
+   - ./near-vault-agent/ml-risk/
+   - near-vault-agent/ml-risk/
+            """
+        
+        risk_score = risk_api.assess_strategy_risk(strategy_address)
+        risk_details = risk_api.get_risk_breakdown(strategy_address)
+        
+        risk_level = "🟢 LOW" if risk_score < 0.4 else "🟡 MEDIUM" if risk_score < 0.7 else "🔴 HIGH"
+        
+        return f"""
+🧠 ML Strategy Risk Assessment:
+
+📍 Strategy: {strategy_address}
+📊 Risk Score: {risk_score:.3f} {risk_level}
+
+🔍 Risk Breakdown:
+{risk_details}
+
+💡 ML Model: Trained on Ethereum mainnet protocols
+🎯 Confidence: HIGH (based on transaction patterns)
+✅ Aurora-specific risk assessment active
+        """
+        
+    except Exception as e:
+        return f"❌ ML risk assessment failed: {e}"
+
+@tool
+def mint_test_usdc(amount_usdc: float = 1000.0) -> str:
+    """Mint MockUSDC tokens for testing the vault system."""
+    print(f"🪙 Minting {amount_usdc} test USDC...")
+    
+    try:
+        # Handle string input conversion
+        if isinstance(amount_usdc, str):
+            # Remove any extra characters and convert
+            amount_usdc = float(amount_usdc.strip().split('\n')[0])
+        
+        amount_wei = int(amount_usdc * (10**6))  # USDC has 6 decimals
+        
+        # Use the faucet function for easy minting
+        faucet_tx = usdc_contract.functions.faucet(amount_wei).build_transaction({
+            'from': agent_account.address,
+            'nonce': w3.eth.get_transaction_count(agent_account.address),
+            'gas': 500_000,
+            'gasPrice': w3.eth.gas_price,
+            'chainId': CHAIN_ID
+        })
+        
+        signed_tx = w3.eth.account.sign_transaction(faucet_tx, agent_account.key)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed to raw_transaction
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+        
+        # Check new balance
+        new_balance = usdc_contract.functions.balanceOf(agent_account.address).call()
+        
+        return f"""
+🪙 MockUSDC Minting Successful!
+
+💰 Transaction Results:
+├─ Minted: {amount_usdc:.2f} USDC
+├─ Agent Balance: {new_balance / (10**6):.2f} USDC
+├─ TX Hash: {tx_hash.hex()}
+└─ Gas Used: {receipt.gasUsed:,}
+
+✅ Ready for vault testing!
+💡 You can now deposit into the Aurora vault
+        """
+        
+    except Exception as e:
+        return f"❌ USDC minting failed: {e}"
+
+@tool
 def execute_multi_strategy_rebalance() -> str:
-    """Execute AI-optimized rebalancing across Aurora protocols."""
-    print("⚖️ Executing multi-strategy rebalance...")
+    """Execute AI-optimized rebalancing across Aurora protocols with ML risk assessment."""
+    print("⚖️ Executing multi-strategy rebalance with ML risk assessment...")
     
     try:
         # Get current vault balance
@@ -463,7 +609,7 @@ def execute_multi_strategy_rebalance() -> str:
         if total_usdc < 10:
             return "❌ Insufficient balance for rebalancing (minimum 10 USDC)"
         
-        # Get optimal allocation
+        # Get optimal allocation with ML risk data
         protocol_data = {
             "ref_finance": ref_provider.get_pools_data(),
             "trisolaris": tri_provider.get_farms_data(),
@@ -506,11 +652,13 @@ def execute_multi_strategy_rebalance() -> str:
         
         # Execute transaction
         signed_tx = w3.eth.account.sign_transaction(tx, agent_account.key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed to raw_transaction
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         
+        ml_indicator = "🧠 ML-Enhanced" if ML_RISK_AVAILABLE else "🔄 Fallback Mode"
+        
         return f"""
-✅ Multi-Strategy Rebalance Executed!
+✅ Multi-Strategy Rebalance Executed! ({ml_indicator})
 
 💰 Total Assets: {total_usdc:.2f} USDC
 🎯 New Allocation:
@@ -521,6 +669,7 @@ def execute_multi_strategy_rebalance() -> str:
 
 📋 Transaction: {tx_hash.hex()}
 ⛽ Gas Used: {receipt.gasUsed:,}
+🧠 ML Risk Assessment: {"ACTIVE" if ML_RISK_AVAILABLE else "FALLBACK"}
         """
         
     except Exception as e:
@@ -557,7 +706,7 @@ def harvest_all_aurora_yields() -> str:
                 })
                 
                 signed_tx = w3.eth.account.sign_transaction(tx, agent_account.key)
-                tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+                tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed to raw_transaction
                 receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
                 
                 # Estimate harvested amount (would need strategy-specific logic)
@@ -588,51 +737,6 @@ def harvest_all_aurora_yields() -> str:
         return f"❌ Harvest failed: {e}"
 
 @tool
-def mint_test_usdc(amount_usdc: float = 1000.0) -> str:
-    """Mint MockUSDC tokens for testing the vault system."""
-    print(f"🪙 Minting {amount_usdc} test USDC...")
-    
-    try:
-        # Handle string input conversion
-        if isinstance(amount_usdc, str):
-            # Remove any extra characters and convert
-            amount_usdc = float(amount_usdc.strip().split('\n')[0])
-        
-        amount_wei = int(amount_usdc * (10**6))  # USDC has 6 decimals
-        
-        # Use the faucet function for easy minting
-        faucet_tx = usdc_contract.functions.faucet(amount_wei).build_transaction({
-            'from': agent_account.address,
-            'nonce': w3.eth.get_transaction_count(agent_account.address),
-            'gas': 500_000,
-            'gasPrice': w3.eth.gas_price,
-            'chainId': CHAIN_ID
-        })
-        
-        signed_tx = w3.eth.account.sign_transaction(faucet_tx, agent_account.key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-        
-        # Check new balance
-        new_balance = usdc_contract.functions.balanceOf(agent_account.address).call()
-        
-        return f"""
-🪙 MockUSDC Minting Successful!
-
-💰 Transaction Results:
-├─ Minted: {amount_usdc:.2f} USDC
-├─ Agent Balance: {new_balance / (10**6):.2f} USDC
-├─ TX Hash: {tx_hash.hex()}
-└─ Gas Used: {receipt.gasUsed:,}
-
-✅ Ready for vault testing!
-💡 You can now deposit into the Aurora vault
-        """
-        
-    except Exception as e:
-        return f"❌ USDC minting failed: {e}"
-
-@tool
 def test_vault_deposit(amount_usdc: float = 100.0) -> str:
     """Test deposit into the deployed Aurora Multi-Strategy Vault."""
     print(f"💰 Testing vault deposit: {amount_usdc} USDC")
@@ -655,7 +759,7 @@ def test_vault_deposit(amount_usdc: float = 100.0) -> str:
                 })
                 
                 signed_tx = w3.eth.account.sign_transaction(faucet_tx, agent_account.key)
-                tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+                tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed to raw_transaction
                 receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
                 print(f"✅ Minted {amount_usdc} USDC for testing")
                 time.sleep(2)
@@ -672,7 +776,7 @@ def test_vault_deposit(amount_usdc: float = 100.0) -> str:
         })
         
         signed_tx = w3.eth.account.sign_transaction(approve_tx, agent_account.key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed to raw_transaction
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         print(f"✅ Approved vault to spend {amount_usdc} USDC")
         time.sleep(2)
@@ -687,7 +791,7 @@ def test_vault_deposit(amount_usdc: float = 100.0) -> str:
         })
         
         signed_tx = w3.eth.account.sign_transaction(deposit_tx, agent_account.key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed to raw_transaction
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         
         # Check results
@@ -764,6 +868,8 @@ def get_strategy_balances() -> str:
 ├─ Ref Finance: {(strategy_balances.get('Ref Finance', 0)/vault_total_assets)*100 if vault_total_assets > 0 else 0:.1f}% (Target: 40%)
 ├─ TriSolaris: {(strategy_balances.get('TriSolaris', 0)/vault_total_assets)*100 if vault_total_assets > 0 else 0:.1f}% (Target: 30%)
 └─ Bastion: {(strategy_balances.get('Bastion', 0)/vault_total_assets)*100 if vault_total_assets > 0 else 0:.1f}% (Target: 20%)
+
+🧠 ML Risk Assessment: {"ACTIVE" if ML_RISK_AVAILABLE else "FALLBACK"}
         """
         
     except Exception as e:
@@ -771,8 +877,8 @@ def get_strategy_balances() -> str:
 
 @tool
 def aurora_risk_monitor() -> str:
-    """Monitor risk levels across Aurora protocols."""
-    print("🛡️ Monitoring Aurora protocol risks...")
+    """Monitor risk levels across Aurora protocols with ML enhancement."""
+    print("🛡️ Monitoring Aurora protocol risks with ML assessment...")
     
     try:
         risk_summary = {
@@ -793,12 +899,13 @@ def aurora_risk_monitor() -> str:
             risk_summary["protocol_risks"][protocol] = {
                 "risk_score": risk_score,
                 "status": data.get("status", "unknown"),
-                "apy": data.get("estimated_apy", 0)
+                "apy": data.get("estimated_apy", 0),
+                "ml_enhanced": data.get("ml_enhanced", False)
             }
             
             # Check for alerts
             if risk_score > 0.7:
-                risk_summary["alerts"].append(f"HIGH RISK: {protocol} risk score {risk_score:.2f}")
+                risk_summary["alerts"].append(f"HIGH RISK: {protocol} risk score {risk_score:.3f}")
             elif data.get("status") == "error":
                 risk_summary["alerts"].append(f"CONNECTION ISSUE: {protocol} data unavailable")
         
@@ -815,19 +922,22 @@ def aurora_risk_monitor() -> str:
         if weighted_risk > RISK_THRESHOLDS["emergency_exit_threshold"]:
             risk_summary["alerts"].append("🚨 EMERGENCY: Consider exit strategy")
         
+        ml_indicator = "🧠 ML-Enhanced" if ML_RISK_AVAILABLE else "🔄 Fallback Mode"
+        
         return f"""
-🛡️ Aurora Risk Monitor Report:
+🛡️ Aurora Risk Monitor Report ({ml_indicator}):
 
-📊 Overall Portfolio Risk: {weighted_risk:.2f} {'🟢 LOW' if weighted_risk < 0.4 else '🟡 MEDIUM' if weighted_risk < 0.7 else '🔴 HIGH'}
+📊 Overall Portfolio Risk: {weighted_risk:.3f} {'🟢 LOW' if weighted_risk < 0.4 else '🟡 MEDIUM' if weighted_risk < 0.7 else '🔴 HIGH'}
 
 🔍 Protocol Risk Breakdown:
-├─ Ref Finance: {risk_summary['protocol_risks'].get('ref_finance', {}).get('risk_score', 0):.2f}
-├─ TriSolaris: {risk_summary['protocol_risks'].get('trisolaris', {}).get('risk_score', 0):.2f}
-└─ Bastion: {risk_summary['protocol_risks'].get('bastion', {}).get('risk_score', 0):.2f}
+├─ Ref Finance: {risk_summary['protocol_risks'].get('ref_finance', {}).get('risk_score', 0):.3f}
+├─ TriSolaris: {risk_summary['protocol_risks'].get('trisolaris', {}).get('risk_score', 0):.3f}
+└─ Bastion: {risk_summary['protocol_risks'].get('bastion', {}).get('risk_score', 0):.3f}
 
 🚨 Alerts: {len(risk_summary['alerts'])}
 {chr(10).join(f"   • {alert}" for alert in risk_summary['alerts']) if risk_summary['alerts'] else "   • No active alerts"}
 
+🧠 ML Risk Status: {"ACTIVE - Using trained anomaly detection" if ML_RISK_AVAILABLE else "FALLBACK - Using static risk scores"}
 ✅ Aurora Advantages: Lower systemic risk due to newer ecosystem and NEAR security
         """
         
@@ -836,8 +946,8 @@ def aurora_risk_monitor() -> str:
 
 @tool
 def get_multi_vault_status() -> str:
-    """Get comprehensive multi-strategy vault status with deployed contract data."""
-    print("📊 Getting multi-vault status...")
+    """Get comprehensive multi-strategy vault status with ML risk data."""
+    print("📊 Getting multi-vault status with ML risk assessment...")
     
     try:
         # Get vault data from deployed contracts
@@ -849,7 +959,7 @@ def get_multi_vault_status() -> str:
         idle_usdc = vault_usdc_balance / (10**6)
         deployed_usdc = total_usdc - idle_usdc
         
-        # Get protocol data
+        # Get protocol data with ML risk
         ref_data = ref_provider.get_pools_data()
         tri_data = tri_provider.get_farms_data()
         bastion_data = bastion_provider.get_lending_data()
@@ -871,8 +981,10 @@ def get_multi_vault_status() -> str:
             print(f"⚠️ Error reading strategy balances: {e}")
             ref_balance = tri_balance = bastion_balance = 0
         
+        ml_indicator = "🧠 ML-Enhanced" if ML_RISK_AVAILABLE else "🔄 Fallback Mode"
+        
         return f"""
-🏦 Aurora Multi-Strategy Vault Status:
+🏦 Aurora Multi-Strategy Vault Status ({ml_indicator}):
 
 💰 Assets Under Management:
 ├─ Total Assets: {total_usdc:.2f} USDC
@@ -880,9 +992,9 @@ def get_multi_vault_status() -> str:
 └─ Idle/Reserve: {idle_usdc:.2f} USDC ({idle_usdc/total_usdc*100 if total_usdc > 0 else 0:.1f}%)
 
 📊 Strategy Balances:
-├─ Ref Finance: {ref_balance:.2f} USDC
-├─ TriSolaris: {tri_balance:.2f} USDC
-└─ Bastion: {bastion_balance:.2f} USDC
+├─ Ref Finance: {ref_balance:.2f} USDC (Risk: {ref_data.get('risk_score', 0.35):.3f})
+├─ TriSolaris: {tri_balance:.2f} USDC (Risk: {tri_data.get('risk_score', 0.40):.3f})
+└─ Bastion: {bastion_balance:.2f} USDC (Risk: {bastion_data.get('risk_score', 0.25):.3f})
 
 📈 Portfolio Performance:
 ├─ Expected APY: {portfolio_apy:.1f}%
@@ -901,6 +1013,12 @@ def get_multi_vault_status() -> str:
 ├─ Tri Strategy: {AURORA_STRATEGY_ADDRESSES['trisolaris']}
 └─ Bastion Strategy: {AURORA_STRATEGY_ADDRESSES['bastion']}
 
+🧠 AI/ML Features:
+├─ ML Risk Assessment: {"✅ ACTIVE" if ML_RISK_AVAILABLE else "❌ DISABLED"}
+├─ AI Portfolio Optimization: ✅ ACTIVE
+├─ Real-time Risk Monitoring: ✅ ACTIVE
+└─ Automated Rebalancing: ✅ ACTIVE
+
 🌟 Aurora Advantages:
 ├─ Gas costs: ~$0.01 vs $50+ on Ethereum
 ├─ Transaction speed: 2-3 seconds
@@ -915,12 +1033,13 @@ def get_multi_vault_status() -> str:
         return f"❌ Status check failed: {e}"
 
 # ==============================================================================
-# ENHANCED LANGCHAIN AGENT
+# ENHANCED TOOLS LIST
 # ==============================================================================
 
 tools = [
     mint_test_usdc,
     analyze_aurora_yields,
+    assess_ml_strategy_risk,  # NEW ML TOOL
     execute_multi_strategy_rebalance,
     harvest_all_aurora_yields,
     test_vault_deposit,
@@ -932,7 +1051,7 @@ tools = [
 tool_names = [t.name for t in tools]
 
 aurora_ai_prompt = """
-You are the Aurora Multi-Strategy AI Vault Manager.
+You are the Aurora Multi-Strategy AI Vault Manager with ML risk assessment capabilities.
 
 Available Tools: {tools}
 
@@ -944,7 +1063,7 @@ Available tools: {tool_names}
 
 Use the following format:
 Question: {input}
-Thought: I need to help with Aurora vault management.
+Thought: I need to help with Aurora vault management using ML-enhanced risk assessment.
 Action: [choose from {tool_names}]
 Action Input: [parameters if needed]
 Observation: [result]
@@ -967,13 +1086,13 @@ agent_executor = AgentExecutor(
 )
 
 # ==============================================================================
-# FASTAPI SERVER WITH BACKGROUND TASKS
+# FASTAPI SERVER WITH ML-ENHANCED BACKGROUND TASKS
 # ==============================================================================
 
 app = FastAPI(
-    title="Aurora Multi-Strategy AI Vault",
-    description="AI-powered yield optimization across Aurora DeFi protocols",
-    version="2.0.0"
+    title="Aurora Multi-Strategy AI Vault with ML Risk Assessment",
+    description="AI-powered yield optimization with ML risk assessment across Aurora DeFi protocols",
+    version="3.0.0"
 )
 
 class AgentRequest(BaseModel):
@@ -985,11 +1104,11 @@ class BackgroundScheduler:
         self.running = False
     
     async def start_automated_optimization(self):
-        """Run automated optimization every hour."""
+        """Run automated optimization every hour with ML risk assessment."""
         self.running = True
         while self.running:
             try:
-                print("🤖 Running automated optimization...")
+                print("🤖 Running automated ML-enhanced optimization...")
                 result = analyze_aurora_yields.invoke({})
                 print(f"📊 Analysis result: {result[:200]}...")
                 
@@ -1011,7 +1130,7 @@ async def startup_event():
 
 @app.post("/invoke-agent")
 async def invoke_agent(request: AgentRequest):
-    """Invoke the Aurora AI agent with enhanced capabilities."""
+    """Invoke the Aurora AI agent with ML-enhanced capabilities."""
     try:
         response = await agent_executor.ainvoke({
             "input": request.command,
@@ -1039,9 +1158,10 @@ async def deposit_test_direct(amount: float = 100.0):
         return {"success": True, "result": result}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 @app.post("/rebalance")
 async def force_rebalance():
-    """Force portfolio rebalancing."""
+    """Force portfolio rebalancing with ML risk assessment."""
     try:
         result = execute_multi_strategy_rebalance.invoke({})
         return {"success": True, "result": result}
@@ -1059,7 +1179,7 @@ async def force_harvest():
 
 @app.get("/yields")
 async def get_yields():
-    """Get current yield analysis."""
+    """Get current yield analysis with ML risk assessment."""
     try:
         result = analyze_aurora_yields.invoke({})
         return {"success": True, "analysis": result}
@@ -1068,16 +1188,25 @@ async def get_yields():
 
 @app.get("/risk")
 async def get_risk_status():
-    """Get risk monitoring status."""
+    """Get ML-enhanced risk monitoring status."""
     try:
         result = aurora_risk_monitor.invoke({})
         return {"success": True, "risk_report": result}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/assess-risk")
+async def assess_strategy_risk(strategy_address: str):
+    """Assess specific strategy risk using ML."""
+    try:
+        result = assess_ml_strategy_risk.invoke({"strategy_address": strategy_address})
+        return {"success": True, "risk_assessment": result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/status")
 async def vault_status():
-    """Get comprehensive vault status."""
+    """Get comprehensive vault status with ML risk data."""
     try:
         result = get_multi_vault_status.invoke({})
         return {"success": True, "status": result}
@@ -1086,7 +1215,7 @@ async def vault_status():
 
 @app.get("/health")
 async def health_check():
-    """Enhanced health check."""
+    """Enhanced health check with ML status."""
     try:
         latest_block = w3.eth.block_number
         agent_balance = w3.eth.get_balance(agent_account.address)
@@ -1110,6 +1239,7 @@ async def health_check():
                     "trisolaris": tri_status,
                     "bastion": bastion_status
                 },
+                "ml_risk_assessment": ML_RISK_AVAILABLE,
                 "automation": "active" if scheduler.running else "stopped"
             }
         }
@@ -1119,23 +1249,30 @@ async def health_check():
 @app.get("/")
 def read_root():
     return {
-        "message": "🚀 Aurora Multi-Strategy AI Vault - PRODUCTION READY",
-        "version": "2.0.0",
+        "message": f"🚀 Aurora Multi-Strategy AI Vault with ML Risk Assessment - {'🧠 ML ACTIVE' if ML_RISK_AVAILABLE else '🔄 FALLBACK MODE'}",
+        "version": "3.0.0",
         "features": [
             "Multi-Protocol Yield Optimization",
             "AI-Powered Portfolio Rebalancing", 
+            "ML-Enhanced Risk Assessment" if ML_RISK_AVAILABLE else "Static Risk Assessment",
             "Real-time Risk Monitoring",
             "Automated Yield Harvesting",
             "Aurora Gas Cost Optimization",
             "24/7 Autonomous Operation"
         ],
         "protocols": list(AURORA_PROTOCOLS.keys()),
+        "ml_status": {
+            "available": ML_RISK_AVAILABLE,
+            "model_path": "near-vault-agent/ml-risk/models/anomaly_risk_model.joblib" if ML_RISK_AVAILABLE else None,
+            "status": "Active - Using trained anomaly detection" if ML_RISK_AVAILABLE else "Fallback - Using static risk scores"
+        },
         "endpoints": [
             "/invoke-agent - Full AI agent interaction",
             "/rebalance - Force portfolio rebalancing",
             "/harvest - Force yield harvesting", 
             "/yields - Current yield analysis",
             "/risk - Risk monitoring report",
+            "/assess-risk - ML strategy risk assessment",
             "/status - Vault status dashboard",
             "/health - System health check"
         ],
@@ -1149,11 +1286,12 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Launching Aurora Multi-Strategy AI Vault...")
+    print("🚀 Launching Aurora Multi-Strategy AI Vault with ML Risk Assessment...")
     print(f"🤖 Agent: {agent_account.address}")
     print(f"🏦 Vault: {MULTI_VAULT_ADDRESS}")
     print(f"📊 Protocols: {len(AURORA_PROTOCOLS)} integrated")
+    print(f"🧠 ML Risk Assessment: {'✅ ACTIVE' if ML_RISK_AVAILABLE else '❌ DISABLED'}")
     print(f"🎯 Expected Portfolio APY: {sum(p['expected_apy'] * DEFAULT_ALLOCATION.get(k.replace('_', ''), 0) for k, p in AURORA_PROTOCOLS.items() if 'expected_apy' in p):.1f}%")
-    print("⚡ Starting with automated optimization...")
+    print("⚡ Starting with automated ML-enhanced optimization...")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)

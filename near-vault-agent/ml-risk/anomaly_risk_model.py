@@ -138,6 +138,7 @@ class DeFiAnomalyDetector:
         )
         self.scaler = StandardScaler()
         self.feature_names = None
+        self.baseline_scores = None  # Store baseline scores
         self.is_trained = False
     
     def train_on_baseline(self, baseline_contracts):
@@ -170,8 +171,8 @@ class DeFiAnomalyDetector:
         self.isolation_forest.fit(X_scaled)
         
         # Get baseline scores for reference
-        baseline_scores = self.isolation_forest.decision_function(X_scaled)
-        print(f"Baseline score range: {baseline_scores.min():.3f} to {baseline_scores.max():.3f}")
+        self.baseline_scores = self.isolation_forest.decision_function(X_scaled).tolist()
+        print(f"Baseline score range: {min(self.baseline_scores):.3f} to {max(self.baseline_scores):.3f}")
         
         self.is_trained = True
         return successful_contracts
@@ -223,13 +224,14 @@ class DeFiAnomalyDetector:
             return "HIGH"
     
     def save_model(self, output_dir="models"):
-        """Save trained model"""
+        """Save trained model with compatible format"""
         os.makedirs(output_dir, exist_ok=True)
         
         model_data = {
-            'isolation_forest': self.isolation_forest,
+            'model': self.isolation_forest,          # Changed key name to match risk_api.py
             'scaler': self.scaler,
             'feature_names': self.feature_names,
+            'baseline_scores': self.baseline_scores,  # Added baseline scores
             'contamination': self.contamination
         }
         
@@ -242,9 +244,10 @@ class DeFiAnomalyDetector:
         model_data = joblib.load(model_path)
         
         detector = cls(contamination=model_data['contamination'])
-        detector.isolation_forest = model_data['isolation_forest']
+        detector.isolation_forest = model_data['model']  # Updated key name
         detector.scaler = model_data['scaler']
         detector.feature_names = model_data['feature_names']
+        detector.baseline_scores = model_data['baseline_scores']
         detector.is_trained = True
         
         return detector

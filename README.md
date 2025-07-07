@@ -1,3 +1,16 @@
+Yield farming options:
+1. bridge to eth and use
+eth-contracts
+
+2. 
+use aurora contracts with deployed strategies:
+VRF strategy for testing
+RefFinanceStrategy
+TriSolarisStrategy
+BastionStrategy
+AI strategy
+
+
  AI-optimized multi-protocol yield farming system
 
 # Real Capabilities:
@@ -12,12 +25,12 @@
 # DEPLOYMENT INFO
 
 📍 Deploying Aurora Multi-Strategy Vault...
-✅ AuroraMultiVault deployed to: 0x4716Be3fdea290c69D7dE19DE9059C7AEA7d64EB
+✅ AuroraMultiVault deployed to: 0x98D6d0b9027Db5f035ab9d608D24896C7812455b
 
 📍 Deploying Strategy Contracts...
-✅ RefFinanceStrategy deployed to: 0x28F6D4Fe5648BbF2506E56a5b7f9D5522C3999f1
-✅ TriSolarisStrategy deployed to: 0xAF2A0D1CDAe0bae796083e772aF2a1736027BC30
-✅ BastionStrategy deployed to: 0xE7d842CAf2f0F3B8BfDE371B06320F8Fd919b4a9
+✅ RefFinanceStrategy deployed to: 0x26416A701AF226a9B65dD498edC99a1EE1671A1a
+✅ TriSolarisStrategy deployed to: 0xeA77EfCF32778715237A9ABAB8A9dEd24e1A1793
+✅ BastionStrategy deployed to: 0x592eC554ec3Af631d76981a680f699F9618B5687
 
 🔧 Setting up strategies in vault...
 Adding Ref Finance strategy (40% allocation)...
@@ -40,11 +53,11 @@ NaN
 NaN
 
 📋 Deployed Contract Addresses:
-   🏦 Aurora Multi-Vault: 0x4716Be3fdea290c69D7dE19DE9059C7AEA7d64EB
+   🏦 Aurora Multi-Vault: 0x98D6d0b9027Db5f035ab9d608D24896C7812455b
    💵 USDC Token: 0xC0933C5440c656464D1Eb1F886422bE3466B1459
-   🔄 Ref Finance Strategy: 0x28F6D4Fe5648BbF2506E56a5b7f9D5522C3999f1
-   🔄 TriSolaris Strategy: 0xAF2A0D1CDAe0bae796083e772aF2a1736027BC30
-   🔄 Bastion Strategy: 0xE7d842CAf2f0F3B8BfDE371B06320F8Fd919b4a9
+   🔄 Ref Finance Strategy: 0x26416A701AF226a9B65dD498edC99a1EE1671A1a
+   🔄 TriSolaris Strategy: 0xeA77EfCF32778715237A9ABAB8A9dEd24e1A1793
+   🔄 Bastion Strategy: 0x592eC554ec3Af631d76981a680f699F9618B5687
 
 🎯 Strategy Allocation:
    📊 Ref Finance (DEX): 40%
@@ -100,6 +113,17 @@ python test_aurora_integration.py
 
 
 
+API ENDPOINTS:
+
+curl -X POST "http://localhost:8000/mint-usdc?amount=1000"
+curl -X POST "http://localhost:8000/deposit-test?amount=100"
+curl http://localhost:8000/status
+curl -X POST http://localhost:8000/rebalance
+curl -X POST http://localhost:8000/invoke-agent \
+  -H "Content-Type: application/json" \
+  -d '{"command": "get_strategy_balances"}'
+curl -X POST http://localhost:8000/harvest
+curl http://localhost:8000/yields
 
 
 

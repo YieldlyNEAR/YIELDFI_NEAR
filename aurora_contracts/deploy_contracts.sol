@@ -284,7 +284,7 @@ contract AuroraMultiVault is ERC20, Ownable, ReentrancyGuard {
 contract RefFinanceStrategy {
     IERC20 public immutable asset;
     address public immutable vault;
-    address public constant REF_ROUTER = 0x2d3162c6c6495E5C2D62BB38aFdF44a8b0Ed6c57;
+    address public constant REF_ROUTER = 0x2D3162c6C6495E5c2d62bb38afdf44A8B0ed6C57;
     
     constructor(address _asset, address _vault) {
         asset = IERC20(_asset);

@@ -8,7 +8,7 @@ import "./interfaces/Strategies.sol";
 
 /// @title NearVrfYieldStrategy
 /// @notice A strategy that uses block variables for pseudo-randomness on EVM testnets.
-/// @dev This is for testing and demonstration purposes ONLY. Not secure for production.
+/// @dev for testing and demonstration purposes. Not secure for production.
 contract NearVrfYieldStrategy is IStrategies, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
