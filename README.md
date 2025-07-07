@@ -105,6 +105,11 @@ BastionStrategy.sol - Bastion lending integration
 AuroraVRFStrategy.sol - VRF random strategy
 AIRebalancer.sol - AI-controlled rebalancing logic
 
+   🏦 Aurora Multi-Vault: 0x494672E363A914e0314B7d70Ad7b4F99E66E789a
+   💵 USDC Token: 0xC0933C5440c656464D1Eb1F886422bE3466B1459
+   🔄 Ref Finance Strategy: 0x6B6A30149b99A09b697805eA5b2AaDCbC396586a
+   🔄 TriSolaris Strategy: 0x7964bBECA179E4e00c02A71A84C6A327E3e808Cb
+   🔄 Bastion Strategy: 0xFF2B890de3C8f2eE8725678F2a2598b5C42E4fAc
 
 # AI Vault Agent Endpoints:
 i.e. for:
@@ -123,6 +128,8 @@ Deposits a specific amount of USDC from your agent's wallet into the vault.
 Force Rebalance
 curl -X POST http://localhost:8000/rebalance
 Triggers an immediate AI-optimized rebalance of assets across all strategies.
+
+REBALANCE_INTERVAL is set to 1 hour
 
 Force Harvest
 curl -X POST http://localhost:8000/harvest
@@ -146,7 +153,7 @@ curl http://localhost:8000/risk
 Fetches the latest ML-enhanced risk report for the entire portfolio.
 
 Assess a Specific Strategy's Risk
-curl -X POST "http://localhost:8000/assess-risk?strategy_address=0xYourStrategyAddressHere"
+curl -X POST "http://localhost:8000/assess-risk?strategy_address=0x841eC1D601B1E9392ec9ba840eF1618beE8D9911"
 Gets a detailed ML-based risk score for a single strategy contract address.
 
 ✅ System Health
