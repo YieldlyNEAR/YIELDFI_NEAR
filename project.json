@@ -1,0 +1,25 @@
+{
+    "name": "YieldFi",
+    "tagline": "An AI-powered, multi-strategy yield aggregator on the Aurora network.",
+    "description": "YieldFi is an intelligent, multi-protocol yield aggregator built on the Aurora network. It leverages a sophisticated AI agent, enhanced with a machine learning risk model, to dynamically manage and optimize a portfolio of digital assets across the Aurora DeFi ecosystem. The system automatically allocates user deposits to various strategies, such as lending on Bastion or providing liquidity on Ref Finance and Trisolaris, to maximize returns while actively managing risk.",
+    "team": [
+      {
+        "name": "Phat",
+        "email": "patrickloughran121@gmail.com"
+      }
+    ],
+    "demo_url": "https://lively-starburst-9bc69c.netlify.app",
+    "video_url": "https://drive.google.com/drive/folders/12KsU-nX9aWzcXrQ8TAUGsjs7nG9U64qD?usp=drive_link",
+    "technologies": [
+      "Aurora EVM",
+      "Solidity",
+      "LangChain",
+      "Python",
+      "FastAPI",
+      "Web3.py",
+      "Scikit-learn",
+      "The Graph",
+      "React"
+    ]
+  }
+  
