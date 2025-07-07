@@ -47,7 +47,7 @@ A custom-trained anomaly detection model that provides real-time risk scores for
 
 ## Deployment on Aurora Testnet
 
-The following contracts have been deployed and verified on the Aurora Testnet.
+The following contracts, and multiple renditions, have been deployed and verified on the Aurora Testnet.
 
 * 🏦 **Aurora Multi-Vault:** `0x15a616EB9df9fa0B8520C66a234f9BBD172847F5`
 * 💵 **MockUSDC Token:** `0xC0933C5440c656464D1Eb1F886422bE3466B1459`
