@@ -190,13 +190,19 @@ contract AuroraMultiVault is ERC20, Ownable, ReentrancyGuard {
                 strategy.balance = target;
                 totalDeployed -= excess;
             } else if (strategy.balance < target) {
-                // Deploy more
+                // Deploy more by calling the strategy's deposit function
                 uint256 needed = target - strategy.balance;
                 uint256 available = asset.balanceOf(address(this));
                 uint256 toDeposit = needed > available ? available : needed;
-                
+    
                 if (toDeposit > 0) {
-                    asset.transfer(strategy.strategyAddress, toDeposit);
+                    // Approve the strategy to take the funds, then call its deposit function
+                    asset.approve(strategy.strategyAddress, toDeposit);
+                    (bool success, ) = strategy.strategyAddress.call(
+                        abi.encodeWithSignature("deposit(uint256)", toDeposit)
+                    );
+                    require(success, "Strategy deposit failed");
+        
                     strategy.balance += toDeposit;
                     totalDeployed += toDeposit;
                 }
@@ -221,27 +227,33 @@ contract AuroraMultiVault is ERC20, Ownable, ReentrancyGuard {
     }
     
     // Internal functions
-    function _autoRebalance() internal {
-        if (block.timestamp < lastRebalance + REBALANCE_INTERVAL) return;
+function _autoRebalance() internal {
+    if (block.timestamp < lastRebalance + REBALANCE_INTERVAL) return;
+    
+    uint256 totalBalance = asset.balanceOf(address(this));
+    
+    // Deploy according to allocation percentages
+    for (uint256 i = 0; i < strategies.length; i++) {
+        Strategy storage strategy = strategies[i];
+        if (!strategy.active) continue;
         
-        uint256 totalBalance = asset.balanceOf(address(this));
+        uint256 targetAmount = (totalBalance * strategy.allocation) / 10000;
         
-        // Deploy according to allocation percentages
-        for (uint256 i = 0; i < strategies.length; i++) {
-            Strategy storage strategy = strategies[i];
-            if (!strategy.active) continue;
-            
-            uint256 targetAmount = (totalBalance * strategy.allocation) / 10000;
-            
-            if (targetAmount > 0) {
-                asset.transfer(strategy.strategyAddress, targetAmount);
-                strategy.balance += targetAmount;
-                totalDeployed += targetAmount;
-            }
+        if (targetAmount > 0) {
+            // USE THE CORRECT APPROVE-AND-CALL PATTERN
+            asset.approve(strategy.strategyAddress, targetAmount);
+            (bool success, ) = strategy.strategyAddress.call(
+                abi.encodeWithSignature("deposit(uint256)", targetAmount)
+            );
+            require(success, "AutoRebalance: Strategy deposit failed");
+
+            strategy.balance += targetAmount;
+            totalDeployed += targetAmount;
         }
-        
-        lastRebalance = block.timestamp;
     }
+    
+    lastRebalance = block.timestamp;
+}
     
     function _withdrawFromStrategies(uint256 amount) internal {
         uint256 remaining = amount;
@@ -263,8 +275,14 @@ contract AuroraMultiVault is ERC20, Ownable, ReentrancyGuard {
     }
     
     function _withdrawFromStrategy(address strategy, uint256 amount) internal {
-        // Simple transfer back (real strategies would have complex withdrawal logic)
-        IERC20(asset).transferFrom(strategy, address(this), amount);
+        // Call the strategy's own withdraw function to "push" funds back to the vault.
+        // This requires casting the address to the strategy interface/contract type.
+        // A low-level `call` is safest and most flexible here.
+
+        (bool success, ) = strategy.call(
+            abi.encodeWithSignature("withdraw(uint256)", amount)
+        );
+        require(success, "Strategy withdrawal failed");
     }
     
     // View functions
